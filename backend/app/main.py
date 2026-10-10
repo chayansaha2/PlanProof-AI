@@ -1,6 +1,3 @@
-
-
-```python
 from typing import Any
 
 from fastapi import FastAPI
@@ -68,5 +65,3 @@ def validate(plan: PlanRequest) -> dict[str, Any]:
 @app.post("/repair")
 def repair(plan: PlanRequest) -> dict[str, Any]:
     return repair_plan(plan.model_dump())
-```
-
