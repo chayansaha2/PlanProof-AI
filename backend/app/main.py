@@ -25,11 +25,10 @@ def root():
     return {
         "name": "PlanProof AI",
         "status": "running",
-        "message": "Plan repair API is ready",
+        "message": "PlanProof AI API is ready",
     }
 
 
 @app.get("/health")
 def health():
     return {"status": "healthy"}
-
