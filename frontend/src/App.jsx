@@ -1,7 +1,7 @@
 import React from "react";
 import { useEffect, useState } from "react";
 
-const API = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+const API = (import.meta.env.VITE_API_URL || "https://planproof-ai.onrender.com").replace(/\/+$/, "");
 export default function App() {
   const [apiStatus, setApiStatus] = useState("Checking...");
   const [tasks, setTasks] = useState("T2, T1, T3");
