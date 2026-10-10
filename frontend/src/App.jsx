@@ -1,8 +1,7 @@
 import React from "react";
 import { useEffect, useState } from "react";
 
-const API = `${window.location.protocol}//${window.location.hostname.replace(/-5173(?=\.app\.github\.dev$)/, "-8000")}`;
-
+const API = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 export default function App() {
   const [apiStatus, setApiStatus] = useState("Checking...");
   const [tasks, setTasks] = useState("T2, T1, T3");
