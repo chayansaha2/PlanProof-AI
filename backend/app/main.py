@@ -1,5 +1,6 @@
 
 
+```python
 from typing import Any
 
 from fastapi import FastAPI
@@ -16,8 +17,6 @@ app = FastAPI(
     version="0.1.0",
 )
 
-
-# Allow requests from the deployed frontend and local development.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -69,4 +68,5 @@ def validate(plan: PlanRequest) -> dict[str, Any]:
 @app.post("/repair")
 def repair(plan: PlanRequest) -> dict[str, Any]:
     return repair_plan(plan.model_dump())
+```
 
