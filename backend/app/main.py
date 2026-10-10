@@ -1,6 +1,11 @@
 
+from typing import Any
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+from app.validator import validate_plan
 
 app = FastAPI(
     title="PlanProof AI API",
@@ -20,15 +25,33 @@ app.add_middleware(
 )
 
 
+class PlanRequest(BaseModel):
+    task_order: list[str] = Field(
+        ..., description="Current order of task IDs"
+    )
+    required_tasks: list[str] = Field(
+        ..., description="All task IDs required in the plan"
+    )
+    precedence_constraints: list[list[str]] = Field(
+        default_factory=list,
+        description="Each pair is [prerequisite, dependent_task]",
+    )
+
+
 @app.get("/")
 def root():
     return {
         "name": "PlanProof AI",
         "status": "running",
-        "message": "PlanProof AI API is ready",
+        "message": "Plan validation API is ready",
     }
 
 
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+
+@app.post("/validate")
+def validate(plan: PlanRequest) -> dict[str, Any]:
+    return validate_plan(plan.model_dump())
