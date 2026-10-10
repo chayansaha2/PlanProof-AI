@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.validator import validate_plan
+from app.repair import repair_plan
 
 app = FastAPI(
     title="PlanProof AI API",
@@ -19,6 +20,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],
+    allow_origin_regex=r"https://.*\.app\.github\.dev",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,3 +57,8 @@ def health():
 @app.post("/validate")
 def validate(plan: PlanRequest) -> dict[str, Any]:
     return validate_plan(plan.model_dump())
+
+
+@app.post("/repair")
+def repair(plan: PlanRequest) -> dict[str, Any]:
+    return repair_plan(plan.model_dump())

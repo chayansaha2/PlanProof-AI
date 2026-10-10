@@ -1,301 +1,181 @@
+import React from "react";
+import { useEffect, useState } from "react";
 
-import { useState } from "react";
-import {
-  Activity,
-  ArrowRight,
-  CheckCircle2,
-  CircleAlert,
-  GitBranch,
-  LayoutDashboard,
-  ListChecks,
-  RotateCcw,
-  ShieldCheck,
-  Upload,
-  Zap,
-} from "lucide-react";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-
-const initialPlan = {
-  task_order: ["T2", "T1", "T3", "T4"],
-  required_tasks: ["T1", "T2", "T3", "T4"],
-  precedence_constraints: [
-    ["T1", "T2"],
-    ["T2", "T3"],
-    ["T1", "T4"],
-  ],
-};
+const API = `${window.location.protocol}//${window.location.hostname.replace(/-5173(?=\.app\.github\.dev$)/, "-8000")}`;
 
 export default function App() {
-  const [plan, setPlan] = useState(initialPlan);
+  const [apiStatus, setApiStatus] = useState("Checking...");
+  const [tasks, setTasks] = useState("T2, T1, T3");
+  const [constraints, setConstraints] = useState("T1,T2");
   const [result, setResult] = useState(null);
+  const [resultType, setResultType] = useState("validate");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    fetch(`${API}/health`)
+      .then(r => {
+        if (!r.ok) throw new Error("API unavailable");
+        return r.json();
+      })
+      .then(data => setApiStatus(data.status || "Connected"))
+      .catch(() => setApiStatus("Not connected"));
+  }, []);
+
   async function validatePlan() {
+    setResultType("validate");
     setLoading(true);
     setError("");
     setResult(null);
 
+    const taskOrder = tasks.split(",").map(s => s.trim()).filter(Boolean);
+    const edges = constraints.split("\n").flatMap(line =>
+      line.split(";").map(s => s.trim()).filter(Boolean).map(pair =>
+        pair.split(",").map(s => s.trim())
+      )
+    );
+
+    if (edges.some(edge => edge.length !== 2)) {
+      setError("Enter each dependency as BeforeTask,AfterTask.");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await fetch(`${API_URL}/validate`, {
+      const response = await fetch(`${API}/validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(plan),
+        body: JSON.stringify({
+          task_order: taskOrder,
+          required_tasks: taskOrder,
+          precedence_constraints: edges
+        })
       });
-
-      if (!response.ok) {
-        throw new Error(`API returned HTTP ${response.status}`);
-      }
-
-      setResult(await response.json());
-    } catch {
-      setError(
-        "Cannot connect to the PlanProof API. Start the backend and try again."
-      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(JSON.stringify(data));
+      setResult(data);
+    } catch (e) {
+      setError(`Could not validate the plan. Check that the backend is running and its port 8000 is accessible. ${e.message}`);
     } finally {
       setLoading(false);
     }
   }
 
-  function resetPlan() {
-    setPlan(initialPlan);
-    setResult(null);
+
+  async function repairPlan() {
+    setResultType("repair");
+    setLoading(true);
     setError("");
-  }
-
-  function updateOrder(value) {
-    setPlan((current) => ({
-      ...current,
-      task_order: value
-        .split(",")
-        .map((task) => task.trim())
-        .filter(Boolean),
-    }));
     setResult(null);
-  }
 
-  const issueCount = result
-    ? result.violations.length + result.errors.length
-    : null;
+    const taskOrder = tasks.split(",").map(s => s.trim()).filter(Boolean);
+    const edges = constraints
+      .split("\n")
+      .flatMap(line =>
+        line.split(";").map(s => s.trim()).filter(Boolean).map(pair =>
+          pair.split(",").map(s => s.trim())
+        )
+      );
+
+    if (edges.some(edge => edge.length !== 2)) {
+      setError("Enter each dependency as BeforeTask,AfterTask.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API}/repair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task_order: taskOrder,
+          required_tasks: taskOrder,
+          precedence_constraints: edges
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(JSON.stringify(data));
+      setResult(data);
+    } catch (e) {
+      setError(`Could not repair the plan. ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="#home">
-          <span className="brand-mark"><GitBranch size={22} /></span>
-          <span>PlanProof<span className="brand-ai"> AI</span></span>
-        </a>
-
-        <p className="nav-label">WORKSPACE</p>
-        <a className="nav-item active" href="#dashboard">
-          <LayoutDashboard size={18} /> Dashboard
-        </a>
-        <a className="nav-item" href="#plan-editor">
-          <ListChecks size={18} /> Plan validator
-        </a>
-        <a className="nav-item" href="#results">
-          <ShieldCheck size={18} /> Validation results
-        </a>
-
-        <div className="sidebar-bottom">
-          <div className="engine-status">
-            <span className="status-dot" />
-            <div>
-              <strong>PlanProof Engine</strong>
-              <small>API connection required</small>
-            </div>
-          </div>
-          <p className="sidebar-caption">Constraint-aware plan repair</p>
-        </div>
+        <div className="brand"><span className="brand-mark">P</span><span>PlanProof <b>AI</b></span></div>
+        <p className="side-label">WORKSPACE</p>
+        <div className="nav-item active">▦ &nbsp; Plan Validator</div>
+        <div className="nav-item">◇ &nbsp; Plan Repair <small>Next</small></div>
+        <div className="sidebar-bottom">Constraint-aware planning<br /><span>Research prototype · v0.1</span></div>
       </aside>
 
-      <main className="main-content" id="dashboard">
+      <main className="main-content">
         <header className="topbar">
-          <div>
-            <p className="eyebrow">WORKSPACE / OVERVIEW</p>
-            <h1>Plan validation</h1>
-          </div>
-          <div className="topbar-badge">
-            <Activity size={16} /> Research prototype
-          </div>
+          <div><span className="eyebrow">WORKSPACE / OVERVIEW</span><h1>Plan Validation</h1></div>
+          <div className="status-pill"><span className={apiStatus === "healthy" || apiStatus === "running" ? "status-dot" : "status-dot offline"}></span> API {apiStatus}</div>
         </header>
 
-        <section className="welcome-section">
-          <div>
-            <p className="eyebrow light">INTELLIGENT PLAN ANALYSIS</p>
-            <h2>Make every task order count.</h2>
-            <p>
-              Validate dependencies, identify ordering conflicts, and inspect
-              your project plan.
-            </p>
-          </div>
-          <div className="welcome-icon"><GitBranch size={54} /></div>
+        <section className="welcome">
+          <div><span className="eyebrow light">PLANPROOF AI ENGINE</span><h2>Make every task order<br />provably valid.</h2><p>Check task dependencies and identify precedence violations before work begins.</p></div>
+          <div className="hero-symbol">✓</div>
         </section>
 
-        <section className="stats-grid">
-          <article className="stat-card">
-            <span className="stat-icon blue"><ListChecks size={20} /></span>
-            <p>Required tasks</p>
-            <strong>{plan.required_tasks.length}</strong>
-            <small>Tasks in this plan</small>
-          </article>
-          <article className="stat-card">
-            <span className="stat-icon purple"><GitBranch size={20} /></span>
-            <p>Dependencies</p>
-            <strong>{plan.precedence_constraints.length}</strong>
-            <small>Prerequisite relationships</small>
-          </article>
-          <article className="stat-card">
-            <span className="stat-icon green"><ShieldCheck size={20} /></span>
-            <p>Plan status</p>
-            <strong className="status-text">
-              {result ? (result.valid ? "Valid" : "Issues") : "Not checked"}
-            </strong>
-            <small>
-              {result ? "Latest validation" : "Run validation to check"}
-            </small>
-          </article>
-          <article className="stat-card">
-            <span className="stat-icon orange"><CircleAlert size={20} /></span>
-            <p>Issues found</p>
-            <strong>{issueCount ?? "—"}</strong>
-            <small>From latest validation</small>
-          </article>
-        </section>
+        <div className="section-heading"><div><h2>Validate a project plan</h2><p>Enter tasks in their proposed execution order.</p></div><span className="tag">LIVE API</span></div>
 
         <section className="workspace-grid">
-          <article className="panel plan-panel" id="plan-editor">
-            <div className="panel-heading">
-              <div>
-                <h3>Plan editor</h3>
-                <p>Modify the task order before validating.</p>
+          <div className="panel">
+            <label htmlFor="tasks">Task execution order</label>
+            <textarea id="tasks" value={tasks} onChange={e => setTasks(e.target.value)} rows="3" placeholder="T1, T2, T3" />
+            <p className="field-help">Separate task IDs with commas.</p>
+            <label htmlFor="constraints">Required dependencies</label>
+            <textarea id="constraints" value={constraints} onChange={e => setConstraints(e.target.value)} rows="3" placeholder={"T1,T2\nT2,T3"} />
+            <p className="field-help">One dependency per line: prerequisite,dependent.</p>
+            <button className="primary-button" onClick={validatePlan} disabled={loading}>{loading ? "Processing..." : "✓  Validate plan"}</button>
+            <button className="primary-button" onClick={repairPlan} disabled={loading} style={{ marginTop: "10px" }}>{loading ? "Processing..." : "↻  Repair plan"}</button>
+            {error && <p className="error-message">{error}</p>}
+          </div>
+
+          <div className="panel result-panel">
+            <span className="eyebrow">VALIDATION RESULT</span>
+            {!result && !error && <div className="empty-result"><div className="result-icon">↗</div><h3>Awaiting analysis</h3><p>Submit your plan to check task order and dependency constraints.</p></div>}
+            {result && <div className="result-content">
+              <div className={(resultType === "repair" ? result.success : result.valid) ? "result-icon success" : "result-icon failure"}>
+                {(resultType === "repair" ? result.success : result.valid) ? "✓" : "!"}
               </div>
-              <span className="panel-icon"><ListChecks size={19} /></span>
-            </div>
-
-            <label htmlFor="task-order">Current task order</label>
-            <textarea
-              id="task-order"
-              value={plan.task_order.join(", ")}
-              onChange={(event) => updateOrder(event.target.value)}
-              rows={3}
-              placeholder="T1, T2, T3, T4"
-            />
-            <small className="field-help">
-              Enter task IDs separated by commas.
-            </small>
-
-            <div className="dependency-heading">
-              <strong>Precedence constraints</strong>
-              <span>{plan.precedence_constraints.length} rules</span>
-            </div>
-
-            <div className="dependency-list">
-              {plan.precedence_constraints.map(([before, after], index) => (
-                <div className="dependency-row" key={`${before}-${after}-${index}`}>
-                  <span className="task-chip">{before}</span>
-                  <ArrowRight size={16} />
-                  <span className="task-chip">{after}</span>
-                  <span className="dependency-note">must come first</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="button-row">
-              <button
-                className="primary-button"
-                onClick={validatePlan}
-                disabled={loading}
-              >
-                <ShieldCheck size={17} />
-                {loading ? "Validating..." : "Validate plan"}
-              </button>
-              <button className="secondary-button" onClick={resetPlan}>
-                <RotateCcw size={16} /> Reset
-              </button>
-            </div>
-          </article>
-
-          <article className="panel results-panel" id="results">
-            <div className="panel-heading">
-              <div>
-                <h3>Validation results</h3>
-                <p>Results from the PlanProof API.</p>
-              </div>
-              <span className="panel-icon"><Zap size={19} /></span>
-            </div>
-
-            {!result && !error && (
-              <div className="empty-state">
-                <div className="empty-icon"><ShieldCheck size={32} /></div>
-                <h4>Ready to analyze</h4>
-                <p>
-                  Run validation to check task completeness, duplicate IDs,
-                  unknown tasks, and prerequisite order.
-                </p>
-              </div>
-            )}
-
-            {error && (
-              <div className="message error-message">
-                <CircleAlert size={20} />
-                <div>
-                  <strong>Connection error</strong>
-                  <p>{error}</p>
-                </div>
-              </div>
-            )}
-
-            {result && (
-              <div className="result-content">
-                <div className={`message ${result.valid ? "success-message" : "error-message"}`}>
-                  {result.valid
-                    ? <CheckCircle2 size={22} />
-                    : <CircleAlert size={22} />}
-                  <div>
-                    <strong>{result.valid ? "Plan is valid" : "Plan needs attention"}</strong>
-                    <p>
-                      {result.valid
-                        ? "All supplied structural checks passed."
-                        : `${issueCount} issue(s) reported by the validator.`}
-                    </p>
+              <h3>{resultType === "repair"
+                ? (result.success ? "Repair successful" : "Repair unsuccessful")
+                : (result.valid ? "Plan is valid" : "Plan needs attention")}</h3>
+              <p>{resultType === "repair"
+                ? (result.success ? "A valid task order has been generated." : (result.errors || ["The plan could not be repaired."]).join(" "))
+                : (result.valid ? "No precedence violations were reported." : "The validator found dependency violations.")}</p>
+              {resultType === "repair" && result.success && <div className="repaired-order">
+                <strong>Plan repair comparison</strong>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
+                  <div style={{ padding: "12px", borderRadius: "10px", background: "rgba(255, 120, 100, 0.09)", border: "1px solid rgba(255, 120, 100, 0.25)" }}>
+                    <small style={{ color: "#ff9b91" }}>ORIGINAL ORDER</small>
+                    <p style={{ margin: "10px 0", overflowWrap: "anywhere" }}>{(result.original_order || []).join(" → ")}</p>
+                  </div>
+                  <div style={{ padding: "12px", borderRadius: "10px", background: "rgba(50, 210, 150, 0.09)", border: "1px solid rgba(50, 210, 150, 0.25)" }}>
+                    <small style={{ color: "#55e0b0" }}>REPAIRED ORDER</small>
+                    <p style={{ margin: "10px 0", overflowWrap: "anywhere" }}>{(result.repaired_order || []).join(" → ")}</p>
                   </div>
                 </div>
-
-                {result.errors.map((item, index) => (
-                  <div className="issue-row" key={`error-${index}`}>
-                    <CircleAlert size={16} />
-                    <span>{item}</span>
-                  </div>
-                ))}
-
-                {result.violations.map((item, index) => (
-                  <div className="issue-row" key={`violation-${index}`}>
-                    <CircleAlert size={16} />
-                    <span>
-                      {item.type === "precedence_violation"
-                        ? `${item.before} must appear before ${item.after}.`
-                        : `${item.type.replaceAll("_", " ")}: ${(item.tasks || []).join(", ")}`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="panel-footer">
-              <span className="status-dot" />
-              Validation uses supplied task constraints
-            </div>
-          </article>
+                <p style={{ marginTop: "12px" }}>Tasks reordered: <strong>{result.changes ?? 0}</strong></p>
+                <button className="primary-button" onClick={() => navigator.clipboard.writeText((result.repaired_order || []).join(", "))} style={{ marginTop: "8px" }}>
+                  Copy repaired order
+                </button>
+              </div>}
+              <pre>{JSON.stringify(result, null, 2)}</pre>
+            </div>}
+          </div>
         </section>
-
-        <footer className="app-footer">
-          <span>PlanProof AI <span>·</span> Research prototype</span>
-          <span><Upload size={14} /> Plan repair and verification</span>
-        </footer>
+        <footer>PlanProof AI <span>Research prototype · Results depend on the configured validator.</span></footer>
       </main>
     </div>
   );
 }
-
